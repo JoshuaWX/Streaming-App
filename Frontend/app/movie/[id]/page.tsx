@@ -10,17 +10,21 @@ import { Button } from '@/components/ui/button'
 import { fetchMovieDetail, fetchRecommendations, type TmdbMovieDetail, type TmdbMovie } from '@/lib/api'
 import { backdropUrl, posterUrl, formatRuntime, maturityRating, extractYear } from '@/lib/tmdb'
 import { useAuth } from '@/context/auth-context'
+import { useFavourites } from '@/context/favourites-context'
+import { useToast } from '@/hooks/use-toast'
 
 export default function MovieDetailsPage() {
   const params = useParams()
   const tmdbId = Number(params.id)
   const { user } = useAuth()
+  const { isFavourited, add, remove } = useFavourites()
+  const { toast } = useToast()
 
   const [movie, setMovie] = useState<TmdbMovieDetail | null>(null)
   const [related, setRelated] = useState<TmdbMovie[]>([])
   const [loading, setLoading] = useState(true)
-  const [addedToList, setAddedToList] = useState(false)
-  const [isFavorited, setIsFavorited] = useState(false)
+  const [favLoading, setFavLoading] = useState(false)
+  const [favAction, setFavAction] = useState<'adding' | 'removing' | null>(null)
 
   useEffect(() => {
     if (!tmdbId || isNaN(tmdbId)) {
@@ -137,14 +141,34 @@ export default function MovieDetailsPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setIsFavorited(!isFavorited)}
+                    onClick={async () => {
+                      if (!user) {
+                        toast({ title: 'Sign in required', description: 'Please sign in to add favourites.', variant: 'destructive' })
+                        return
+                      }
+                      if (favLoading) return
+                      const wasFavourited = isFavourited(tmdbId)
+                      setFavLoading(true)
+                      try {
+                        if (wasFavourited) {
+                          await remove(tmdbId)
+                        } else {
+                          await add(tmdbId, movie.title, movie.poster_path ?? undefined)
+                        }
+                      } catch (err) {
+                        console.error('Favourite toggle failed:', err)
+                      } finally {
+                        setFavLoading(false)
+                      }
+                    }}
+                    disabled={favLoading}
                     className={`p-3 rounded-full transition-colors ${
-                      isFavorited
+                      isFavourited(tmdbId)
                         ? 'bg-accent text-accent-foreground'
                         : 'bg-input text-foreground hover:bg-input/80'
                     }`}
                   >
-                    <svg className="w-6 h-6" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6" fill={isFavourited(tmdbId) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                   </button>
@@ -201,15 +225,39 @@ export default function MovieDetailsPage() {
                   </Link>
                 )}
                 <Button
-                  onClick={() => setAddedToList(!addedToList)}
+                  onClick={async () => {
+                    if (!user) {
+                      toast({ title: 'Sign in required', description: 'Please sign in to add favourites.', variant: 'destructive' })
+                      return
+                    }
+                    if (favLoading) return
+                    const wasFavourited = isFavourited(tmdbId)
+                    setFavAction(wasFavourited ? 'removing' : 'adding')
+                    setFavLoading(true)
+                    try {
+                      if (wasFavourited) {
+                        await remove(tmdbId)
+                      } else {
+                        await add(tmdbId, movie.title, movie.poster_path ?? undefined)
+                      }
+                    } catch (err) {
+                      console.error('Favourite toggle failed:', err)
+                    } finally {
+                      setFavLoading(false)
+                      setFavAction(null)
+                    }
+                  }}
+                  disabled={favLoading}
                   variant="outline"
                   className={`flex-1 min-w-[200px] ${
-                    addedToList
+                    isFavourited(tmdbId)
                       ? 'bg-accent text-accent-foreground border-accent'
                       : 'bg-input border-border text-foreground hover:bg-input/80'
                   }`}
                 >
-                  {addedToList ? '✓ In List' : '+ Add to List'}
+                  {favLoading
+                    ? (favAction === 'removing' ? 'Removing…' : 'Adding…')
+                    : (isFavourited(tmdbId) ? '❤️ In Favourites' : 'Add to Favourites')}
                 </Button>
               </div>
             </div>

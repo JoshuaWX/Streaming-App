@@ -1,36 +1,22 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import Link from 'next/link'
+import MovieCard from '@/components/movie-card'
+import Footer from '@/components/footer'
+import { Button } from '@/components/ui/button'
+import { Heart } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { useFavourites } from '@/context/favourites-context'
 
-/**
- * Legacy /my-list route — redirects to /favourites.
- */
-export default function MyListPage() {
-  const router = useRouter()
+type SortOption = 'recently-added' | 'title'
 
-  useEffect(() => {
-    router.replace('/favourites')
-  }, [router])
+export default function FavouritesPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { favourites, loading, remove } = useFavourites()
+  const [sortBy, setSortBy] = useState<SortOption>('recently-added')
 
-  return (
-    <main className="min-h-screen bg-background flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground text-lg">Redirecting to Favourites...</div>
-    </main>
-  )
-}
-
-  const handleRemove = async (itemId: string) => {
-    if (!watchlist) return
-    try {
-      await removeFromWatchlist(watchlist.id, itemId)
-      setItems(items.filter((item) => item.id !== itemId))
-    } catch (err) {
-      console.error('Failed to remove:', err)
-    }
-  }
-
-  const sortedItems = [...items].sort((a, b) => {
+  const sortedFavourites = [...favourites].sort((a, b) => {
     switch (sortBy) {
       case 'title':
         return (a.title || '').localeCompare(b.title || '')
@@ -40,12 +26,20 @@ export default function MyListPage() {
     }
   })
 
+  const handleRemove = async (tmdbId: number) => {
+    try {
+      await remove(tmdbId)
+    } catch (err) {
+      console.error('Failed to remove favourite:', err)
+    }
+  }
+
   if (!authLoading && !user) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="text-6xl mb-4">📭</div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Sign in to access your list</h2>
+          <Heart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h2 className="text-2xl font-bold text-foreground mb-2">Sign in to see your favourites</h2>
           <p className="text-muted-foreground mb-8">Create an account or sign in to save movies.</p>
           <Link href="/login">
             <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">Sign In</Button>
@@ -55,10 +49,10 @@ export default function MyListPage() {
     )
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground text-lg">Loading your list...</div>
+        <div className="animate-pulse text-muted-foreground text-lg">Loading favourites...</div>
       </main>
     )
   }
@@ -68,16 +62,21 @@ export default function MyListPage() {
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-card to-background py-16 px-4 md:px-8 border-b border-border">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">My List</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
+              <Heart className="w-6 h-6 text-accent-foreground" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground">Favourites</h1>
+          </div>
           <p className="text-muted-foreground text-lg">
-            {items.length} {items.length === 1 ? 'item' : 'items'} saved
+            {favourites.length} {favourites.length === 1 ? 'movie' : 'movies'} saved
           </p>
         </div>
       </div>
 
       {/* Content Section */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-        {sortedItems.length > 0 ? (
+        {sortedFavourites.length > 0 ? (
           <>
             {/* Sort Options */}
             <div className="flex flex-wrap gap-3 mb-8">
@@ -87,32 +86,33 @@ export default function MyListPage() {
                   key={option}
                   onClick={() => setSortBy(option)}
                   variant={sortBy === option ? 'default' : 'outline'}
-                  className={`text-sm capitalize ${
+                  size="sm"
+                  className={
                     sortBy === option
                       ? 'bg-accent text-accent-foreground'
                       : 'bg-input border-border text-foreground hover:bg-input/80'
-                  }`}
+                  }
                 >
-                  {option.replace('-', ' ')}
+                  {option === 'recently-added' ? 'Recently Added' : 'Title'}
                 </Button>
               ))}
             </div>
 
             {/* Movies Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {sortedItems.map((item) => (
-                <div key={item.id} className="relative group">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {sortedFavourites.map((fav) => (
+                <div key={fav.id} className="relative group">
                   <MovieCard
-                    id={item.tmdb_movie_id}
-                    title={item.title || 'Untitled'}
+                    id={fav.tmdb_id}
+                    title={fav.title || 'Untitled'}
                     rating={0}
                     year={0}
-                    posterPath={item.poster_path}
+                    posterPath={fav.poster_path}
                   />
                   <button
-                    onClick={() => handleRemove(item.id)}
+                    onClick={() => handleRemove(fav.tmdb_id)}
                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-600 hover:bg-red-700 text-white rounded-full p-2 z-10"
-                    aria-label="Remove from list"
+                    aria-label="Remove from favourites"
                   >
                     <svg
                       className="w-4 h-4"
@@ -134,14 +134,14 @@ export default function MyListPage() {
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="text-6xl mb-4">📭</div>
-            <h2 className="text-2xl font-semibold text-foreground mb-2">Your list is empty</h2>
+            <Heart className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h2 className="text-2xl font-semibold text-foreground mb-2">No favourites yet</h2>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Start adding movies and TV shows to your list to keep track of what you want to watch.
+              Start adding movies to your favourites by clicking the heart icon on any movie card.
             </p>
             <Link href="/">
               <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                Browse Content
+                Browse Movies
               </Button>
             </Link>
           </div>

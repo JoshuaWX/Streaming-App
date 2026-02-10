@@ -100,6 +100,15 @@ export interface WatchlistItem {
   created_at: string;
 }
 
+export interface Favourite {
+  id: string;
+  user_id: string;
+  tmdb_id: number;
+  title: string | null;
+  poster_path: string | null;
+  created_at: string;
+}
+
 export interface Profile {
   id: string;
   email: string;

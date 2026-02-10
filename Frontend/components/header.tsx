@@ -1,13 +1,25 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Search, Bell, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 
 export default function Header() {
   const [searchOpen, setSearchOpen] = useState(false)
+  const pathname = usePathname()
+
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname.startsWith(href)
+
+  const navLinks = [
+    { href: '/', label: 'Home' },
+    { href: '/search', label: 'Browse' },
+    { href: '/favourites', label: 'Favourites' },
+  ]
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -23,15 +35,20 @@ export default function Header() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition">
-              Home
-            </Link>
-            <Link href="/search" className="text-sm text-muted-foreground hover:text-foreground transition">
-              Browse
-            </Link>
-            <Link href="/my-list" className="text-sm text-muted-foreground hover:text-foreground transition">
-              My List
-            </Link>
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  'text-sm transition',
+                  isActive(link.href)
+                    ? 'text-accent font-semibold'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
           {/* Search and User */}

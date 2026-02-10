@@ -1,14 +1,35 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Home, Search, Heart, Bell, User, Menu, X, Bookmark, Newspaper, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSidebar } from '@/context/sidebar-context'
 import { useAuth } from '@/context/auth-context'
+import { cn } from '@/lib/utils'
+
+interface NavItem {
+  href: string
+  icon: React.ReactNode
+  title: string
+}
 
 export default function Sidebar() {
   const { isOpen, toggleSidebar } = useSidebar()
   const { user, signOut } = useAuth()
+  const pathname = usePathname()
+
+  const navItems: NavItem[] = [
+    { href: '/', icon: <Home className="w-5 h-5" />, title: 'Home' },
+    { href: '/search', icon: <Search className="w-5 h-5" />, title: 'Search' },
+    { href: '/favourites', icon: <Heart className="w-5 h-5" />, title: 'Favourites' },
+    { href: '/notifications', icon: <Bell className="w-5 h-5" />, title: 'Notifications' },
+    { href: '/watchlist', icon: <Bookmark className="w-5 h-5" />, title: 'Watchlist' },
+    { href: '/news', icon: <Newspaper className="w-5 h-5" />, title: 'News' },
+  ]
+
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
     <>
@@ -29,65 +50,22 @@ export default function Sidebar() {
 
           {/* Navigation Icons */}
           <nav className="flex flex-col gap-6">
-            <Link href="/" title="Home">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Home className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/search" title="Search">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Search className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/my-list" title="My List">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Heart className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/notifications" title="Notifications">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Bell className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/watchlist" title="Watchlist">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Bookmark className="w-5 h-5" />
-              </Button>
-            </Link>
-
-            <Link href="/news" title="News">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg hover:bg-muted"
-              >
-                <Newspaper className="w-5 h-5" />
-              </Button>
-            </Link>
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href} title={item.title}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    'h-10 w-10 rounded-lg',
+                    isActive(item.href)
+                      ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                      : 'hover:bg-muted',
+                  )}
+                >
+                  {item.icon}
+                </Button>
+              </Link>
+            ))}
 
             {user ? (
               <Button
@@ -104,7 +82,12 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-lg hover:bg-muted"
+                  className={cn(
+                    'h-10 w-10 rounded-lg',
+                    isActive('/login')
+                      ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                      : 'hover:bg-muted',
+                  )}
                 >
                   <User className="w-5 h-5" />
                 </Button>

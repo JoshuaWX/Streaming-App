@@ -4,7 +4,9 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import Sidebar from '@/components/sidebar'
 import { SidebarProvider } from '@/context/sidebar-context'
 import { AuthProvider } from '@/context/auth-context'
+import { FavouritesProvider } from '@/context/favourites-context'
 import MainContent from '@/components/main-content'
+import { Toaster } from '@/components/ui/toaster'
 
 import './globals.css'
 
@@ -26,10 +28,13 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased bg-background text-foreground">
         <AuthProvider>
-          <SidebarProvider>
-            <Sidebar />
-            <MainContent>{children}</MainContent>
-          </SidebarProvider>
+          <FavouritesProvider>
+            <SidebarProvider>
+              <Sidebar />
+              <MainContent>{children}</MainContent>
+              <Toaster />
+            </SidebarProvider>
+          </FavouritesProvider>
         </AuthProvider>
       </body>
     </html>

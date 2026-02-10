@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -21,8 +21,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   // If already logged in, redirect
+  useEffect(() => {
+    if (user) {
+      router.replace('/')
+    }
+  }, [user, router])
+
   if (user) {
-    router.push('/')
     return null
   }
 

@@ -180,6 +180,39 @@ export async function fetchCurrentUser() {
   return data;
 }
 
+// ─── Favourites API ──────────────────────────────────────────
+
+export interface FavouriteApi {
+  id: string;
+  user_id: string;
+  tmdb_id: number;
+  title: string | null;
+  poster_path: string | null;
+  created_at: string;
+}
+
+export async function fetchFavourites(): Promise<FavouriteApi[]> {
+  const { data } = await api.get<FavouriteApi[]>('/favourites');
+  return data;
+}
+
+export async function addFavourite(
+  tmdbId: number,
+  title?: string,
+  posterPath?: string,
+): Promise<FavouriteApi> {
+  const { data } = await api.post<FavouriteApi>('/favourites', {
+    tmdb_id: tmdbId,
+    title,
+    poster_path: posterPath,
+  });
+  return data;
+}
+
+export async function removeFavourite(tmdbId: number): Promise<void> {
+  await api.delete(`/favourites/${tmdbId}`);
+}
+
 // ─── TMDB Types (mirrors backend) ────────────────────────────
 
 export interface TmdbMovie {
