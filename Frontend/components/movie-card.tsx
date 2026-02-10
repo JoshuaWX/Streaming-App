@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Play, Plus, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
@@ -28,6 +29,7 @@ interface MovieCardProps {
 }
 
 export default function MovieCard({ id, title, rating, year, posterPath, imageUrl, movie }: MovieCardProps) {
+  const router = useRouter()
   const [isHovered, setIsHovered] = useState(false)
   const movieId = movie?.id || id
   const movieTitle = movie?.title || title
@@ -75,11 +77,13 @@ export default function MovieCard({ id, title, rating, year, posterPath, imageUr
         {/* Hover Overlay */}
         {isHovered && (
           <div className="absolute inset-0 bg-background/95 flex items-center justify-center gap-3" onClick={(e) => e.preventDefault()}>
-            <Link href={`/play?id=${movieId}`} onClick={(e) => e.stopPropagation()}>
-              <Button size="icon" className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground w-12 h-12">
-                <Play className="w-5 h-5" />
-              </Button>
-            </Link>
+            <Button
+              size="icon"
+              className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground w-12 h-12"
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/play?id=${movieId}`); }}
+            >
+              <Play className="w-5 h-5" />
+            </Button>
             <Button
               size="icon"
               variant="outline"
