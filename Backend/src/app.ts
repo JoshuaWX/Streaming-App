@@ -8,6 +8,9 @@ import routes from './routes';
 
 const app = express();
 
+// Trust first proxy (Docker / nginx / cloud LB) so req.ip is the real client IP
+app.set('trust proxy', 1);
+
 // ── Global Middleware ──────────────────────────────────────
 app.use(requestId);
 app.use(securityHeaders);
