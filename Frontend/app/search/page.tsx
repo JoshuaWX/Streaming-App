@@ -2,33 +2,15 @@
 
 import React from "react"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import MovieCard from '@/components/movie-card'
 import Footer from '@/components/footer'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { searchMovies, type TmdbMovie } from '@/lib/api'
+import { extractYear } from '@/lib/tmdb'
 
-const allMovies = [
-  { id: '1', title: 'The Last Horizon', rating: 8.5, year: 2024 },
-  { id: '2', title: 'Echoes of Tomorrow', rating: 8.2, year: 2024 },
-  { id: '3', title: 'Midnight Chronicles', rating: 7.9, year: 2023 },
-  { id: '4', title: 'Beyond the Stars', rating: 8.7, year: 2024 },
-  { id: '5', title: 'Lost in Time', rating: 7.6, year: 2023 },
-  { id: '6', title: 'Crimson Skies', rating: 8.3, year: 2024 },
-  { id: '7', title: 'The Digital Age', rating: 8.1, year: 2024 },
-  { id: '8', title: 'Whispers in the Wind', rating: 7.8, year: 2023 },
-  { id: '9', title: 'The Final Quest', rating: 8.4, year: 2024 },
-  { id: '10', title: 'Neon Dreams', rating: 8.0, year: 2024 },
-  { id: '11', title: 'Thunder Heart', rating: 8.6, year: 2024 },
-  { id: '12', title: 'Silent Witness', rating: 7.7, year: 2024 },
-  { id: '13', title: 'Dark Secrets', rating: 8.2, year: 2024 },
-  { id: '14', title: 'Golden Coast', rating: 7.9, year: 2024 },
-  { id: '15', title: 'Frozen Fire', rating: 8.5, year: 2024 },
-  { id: '16', title: 'The Comeback', rating: 8.1, year: 2024 },
-]
-
-type FilterType = 'all' | 'movie' | 'series'
 type SortType = 'relevance' | 'rating' | 'year'
 
 export default function SearchPage() {
@@ -36,40 +18,52 @@ export default function SearchPage() {
   const initialQuery = searchParams.get('q') || ''
   
   const [query, setQuery] = useState(initialQuery)
-  const [results, setResults] = useState(allMovies)
-  const [filter, setFilter] = useState<FilterType>('all')
+  const [results, setResults] = useState<TmdbMovie[]>([])
   const [sort, setSort] = useState<SortType>('relevance')
+  const [loading, setLoading] = useState(false)
+  const [totalResults, setTotalResults] = useState(0)
 
-  useEffect(() => {
-    let filtered = allMovies
-
-    // Apply search query
-    if (query.trim()) {
-      filtered = filtered.filter(movie =>
-        movie.title.toLowerCase().includes(query.toLowerCase())
-      )
+  const doSearch = useCallback(async (q: string) => {
+    if (!q.trim()) {
+      setResults([])
+      setTotalResults(0)
+      return
     }
+    setLoading(true)
+    try {
+      const data = await searchMovies(q)
+      setResults(data.results)
+      setTotalResults(data.total_results)
+    } catch (err) {
+      console.error('Search failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-    // Apply sorting
-    const sorted = [...filtered]
+  // Search on initial load if query param exists
+  useEffect(() => {
+    if (initialQuery) {
+      doSearch(initialQuery)
+    }
+  }, [initialQuery, doSearch])
+
+  // Sort results locally
+  const sortedResults = [...results].sort((a, b) => {
     switch (sort) {
       case 'rating':
-        sorted.sort((a, b) => b.rating - a.rating)
-        break
+        return b.vote_average - a.vote_average
       case 'year':
-        sorted.sort((a, b) => b.year - a.year)
-        break
+        return extractYear(b.release_date) - extractYear(a.release_date)
       case 'relevance':
       default:
-        // Keep original order for relevance
-        break
+        return 0 // keep API order
     }
-
-    setResults(sorted)
-  }, [query, filter, sort])
+  })
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    doSearch(query)
   }
 
   return (
@@ -95,26 +89,8 @@ export default function SearchPage() {
 
       {/* Results Section */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-        {/* Filter and Sort */}
+        {/* Sort Options */}
         <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-muted-foreground text-sm self-center">Filter:</span>
-            {(['all', 'movie', 'series'] as const).map((option) => (
-              <Button
-                key={option}
-                onClick={() => setFilter(option)}
-                variant={filter === option ? 'default' : 'outline'}
-                className={`text-sm capitalize ${
-                  filter === option
-                    ? 'bg-accent text-accent-foreground'
-                    : 'bg-input border-border text-foreground hover:bg-input/80'
-                }`}
-              >
-                {option}
-              </Button>
-            ))}
-          </div>
-
           <div className="flex flex-wrap gap-2">
             <span className="text-muted-foreground text-sm self-center">Sort:</span>
             {(['relevance', 'rating', 'year'] as const).map((option) => (
@@ -135,39 +111,57 @@ export default function SearchPage() {
         </div>
 
         {/* Results Count */}
-        {query && (
+        {query && !loading && (
           <p className="text-muted-foreground mb-6">
-            Found {results.length} result{results.length !== 1 ? 's' : ''} for{' '}
-            <span className="text-foreground font-semibold">"{query}"</span>
+            Found {totalResults} result{totalResults !== 1 ? 's' : ''} for{' '}
+            <span className="text-foreground font-semibold">&ldquo;{query}&rdquo;</span>
           </p>
         )}
 
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-pulse text-muted-foreground text-lg">Searching...</div>
+          </div>
+        )}
+
         {/* Results Grid */}
-        {results.length > 0 ? (
+        {!loading && sortedResults.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {results.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} />
+            {sortedResults.map((movie) => (
+              <MovieCard
+                key={movie.id}
+                id={movie.id}
+                title={movie.title}
+                rating={movie.vote_average}
+                year={extractYear(movie.release_date)}
+                posterPath={movie.poster_path}
+              />
             ))}
           </div>
-        ) : (
+        ) : !loading && query ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="text-6xl mb-4">🔍</div>
             <h2 className="text-2xl font-semibold text-foreground mb-2">No results found</h2>
             <p className="text-muted-foreground mb-6 max-w-md">
-              {query 
-                ? `We couldn't find anything matching "${query}". Try a different search.`
-                : 'Enter a search term to find movies and TV shows.'}
+              We couldn&apos;t find anything matching &ldquo;{query}&rdquo;. Try a different search.
             </p>
-            {query && (
-              <Button 
-                onClick={() => setQuery('')}
-                className="bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                Clear Search
-              </Button>
-            )}
+            <Button 
+              onClick={() => { setQuery(''); setResults([]); }}
+              className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              Clear Search
+            </Button>
           </div>
-        )}
+        ) : !loading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-6xl mb-4">🔍</div>
+            <h2 className="text-2xl font-semibold text-foreground mb-2">Search for movies</h2>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Enter a search term to find movies and TV shows.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <Footer />

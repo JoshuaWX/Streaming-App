@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import Sidebar from '@/components/sidebar'
 import { SidebarProvider } from '@/context/sidebar-context'
+import { AuthProvider } from '@/context/auth-context'
 import MainContent from '@/components/main-content'
 
 import './globals.css'
@@ -24,10 +25,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased bg-background text-foreground">
-        <SidebarProvider>
-          <Sidebar />
-          <MainContent>{children}</MainContent>
-        </SidebarProvider>
+        <AuthProvider>
+          <SidebarProvider>
+            <Sidebar />
+            <MainContent>{children}</MainContent>
+          </SidebarProvider>
+        </AuthProvider>
       </body>
     </html>
   )

@@ -1,51 +1,96 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import MovieCard from '@/components/movie-card'
 import Footer from '@/components/footer'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/context/auth-context'
+import {
+  fetchWatchlists,
+  fetchWatchlistItems,
+  removeFromWatchlist,
+  createWatchlist,
+  type WatchlistItemApi,
+  type WatchlistApi,
+} from '@/lib/api'
 
-const watchlistMovies = [
-  { id: '1', title: 'The Last Horizon', rating: 8.5, year: 2024 },
-  { id: '2', title: 'Echoes of Tomorrow', rating: 8.2, year: 2024 },
-  { id: '3', title: 'Midnight Chronicles', rating: 7.9, year: 2023 },
-  { id: '4', title: 'Beyond the Stars', rating: 8.7, year: 2024 },
-  { id: '5', title: 'Lost in Time', rating: 7.6, year: 2023 },
-  { id: '6', title: 'Crimson Skies', rating: 8.3, year: 2024 },
-  { id: '7', title: 'The Digital Age', rating: 8.1, year: 2024 },
-  { id: '8', title: 'Whispers in the Wind', rating: 7.8, year: 2023 },
-]
-
-type SortOption = 'recently-added' | 'rating' | 'title' | 'year'
+type SortOption = 'recently-added' | 'title'
 
 export default function MyListPage() {
+  const { user, loading: authLoading } = useAuth()
+  const [watchlist, setWatchlist] = useState<WatchlistApi | null>(null)
+  const [items, setItems] = useState<WatchlistItemApi[]>([])
+  const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<SortOption>('recently-added')
-  const [items, setItems] = useState(watchlistMovies)
 
-  const handleSort = (option: SortOption) => {
-    setSortBy(option)
-    let sorted = [...items]
-
-    switch (option) {
-      case 'rating':
-        sorted.sort((a, b) => b.rating - a.rating)
-        break
-      case 'title':
-        sorted.sort((a, b) => a.title.localeCompare(b.title))
-        break
-      case 'year':
-        sorted.sort((a, b) => b.year - a.year)
-        break
-      case 'recently-added':
-      default:
-        sorted = watchlistMovies
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      setLoading(false)
+      return
     }
 
-    setItems(sorted)
+    async function loadList() {
+      try {
+        let lists = await fetchWatchlists()
+        let wl = lists[0]
+        if (!wl) {
+          wl = await createWatchlist('My List')
+        }
+        setWatchlist(wl)
+        const wlItems = await fetchWatchlistItems(wl.id)
+        setItems(wlItems)
+      } catch (err) {
+        console.error('Failed to load list:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadList()
+  }, [user, authLoading])
+
+  const handleRemove = async (itemId: string) => {
+    if (!watchlist) return
+    try {
+      await removeFromWatchlist(watchlist.id, itemId)
+      setItems(items.filter((item) => item.id !== itemId))
+    } catch (err) {
+      console.error('Failed to remove:', err)
+    }
   }
 
-  const handleRemove = (id: string) => {
-    setItems(items.filter(item => item.id !== id))
+  const sortedItems = [...items].sort((a, b) => {
+    switch (sortBy) {
+      case 'title':
+        return (a.title || '').localeCompare(b.title || '')
+      case 'recently-added':
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
+
+  if (!authLoading && !user) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">📭</div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Sign in to access your list</h2>
+          <p className="text-muted-foreground mb-8">Create an account or sign in to save movies.</p>
+          <Link href="/login">
+            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">Sign In</Button>
+          </Link>
+        </div>
+      </main>
+    )
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-lg">Loading your list...</div>
+      </main>
+    )
   }
 
   return (
@@ -62,15 +107,15 @@ export default function MyListPage() {
 
       {/* Content Section */}
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-12">
-        {items.length > 0 ? (
+        {sortedItems.length > 0 ? (
           <>
             {/* Sort Options */}
             <div className="flex flex-wrap gap-3 mb-8">
               <span className="text-muted-foreground text-sm self-center">Sort by:</span>
-              {(['recently-added', 'rating', 'title', 'year'] as const).map((option) => (
+              {(['recently-added', 'title'] as const).map((option) => (
                 <Button
                   key={option}
-                  onClick={() => handleSort(option)}
+                  onClick={() => setSortBy(option)}
                   variant={sortBy === option ? 'default' : 'outline'}
                   className={`text-sm capitalize ${
                     sortBy === option
@@ -85,11 +130,17 @@ export default function MyListPage() {
 
             {/* Movies Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {items.map((movie) => (
-                <div key={movie.id} className="relative group">
-                  <MovieCard movie={movie} />
+              {sortedItems.map((item) => (
+                <div key={item.id} className="relative group">
+                  <MovieCard
+                    id={item.tmdb_movie_id}
+                    title={item.title || 'Untitled'}
+                    rating={0}
+                    year={0}
+                    posterPath={item.poster_path}
+                  />
                   <button
-                    onClick={() => handleRemove(movie.id)}
+                    onClick={() => handleRemove(item.id)}
                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-600 hover:bg-red-700 text-white rounded-full p-2 z-10"
                     aria-label="Remove from list"
                   >
@@ -118,9 +169,11 @@ export default function MyListPage() {
             <p className="text-muted-foreground mb-6 max-w-md">
               Start adding movies and TV shows to your list to keep track of what you want to watch.
             </p>
-            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              Browse Content
-            </Button>
+            <Link href="/">
+              <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                Browse Content
+              </Button>
+            </Link>
           </div>
         )}
       </div>

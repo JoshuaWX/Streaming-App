@@ -1,12 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { Home, Search, Heart, Bell, User, Menu, X, Bookmark, Newspaper } from 'lucide-react'
+import { Home, Search, Heart, Bell, User, Menu, X, Bookmark, Newspaper, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSidebar } from '@/context/sidebar-context'
+import { useAuth } from '@/context/auth-context'
 
 export default function Sidebar() {
   const { isOpen, toggleSidebar } = useSidebar()
+  const { user, signOut } = useAuth()
 
   return (
     <>
@@ -87,15 +89,27 @@ export default function Sidebar() {
               </Button>
             </Link>
 
-            <Link href="/login" title="Profile">
+            {user ? (
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-10 w-10 rounded-lg hover:bg-muted"
+                title="Sign Out"
+                onClick={() => signOut()}
               >
-                <User className="w-5 h-5" />
+                <LogOut className="w-5 h-5" />
               </Button>
-            </Link>
+            ) : (
+              <Link href="/login" title="Sign In">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-lg hover:bg-muted"
+                >
+                  <User className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
           </nav>
 
           {/* Hamburger Toggle */}

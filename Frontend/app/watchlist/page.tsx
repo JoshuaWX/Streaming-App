@@ -1,42 +1,99 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import MovieCard from '@/components/movie-card'
 import Footer from '@/components/footer'
 import { Button } from '@/components/ui/button'
 import { Clock, Trash2 } from 'lucide-react'
-
-const watchlistItems = [
-  { id: '1', title: 'The Last Horizon', rating: 8.5, year: 2024, addedDate: '2024-02-01' },
-  { id: '2', title: 'Echoes of Tomorrow', rating: 8.2, year: 2024, addedDate: '2024-01-28' },
-  { id: '4', title: 'Beyond the Stars', rating: 8.7, year: 2024, addedDate: '2024-01-25' },
-  { id: '5', title: 'Lost in Time', rating: 7.6, year: 2023, addedDate: '2024-01-20' },
-  { id: '6', title: 'Crimson Skies', rating: 8.3, year: 2024, addedDate: '2024-01-15' },
-  { id: '8', title: 'Whispers in the Wind', rating: 7.8, year: 2023, addedDate: '2024-01-10' },
-]
+import { useAuth } from '@/context/auth-context'
+import {
+  fetchWatchlists,
+  fetchWatchlistItems,
+  removeFromWatchlist,
+  createWatchlist,
+  type WatchlistItemApi,
+  type WatchlistApi,
+} from '@/lib/api'
 
 export default function WatchlistPage() {
-  const [items, setItems] = useState(watchlistItems)
-  const [sortBy, setSortBy] = useState<'added' | 'rating' | 'title' | 'year'>('added')
+  const { user, loading: authLoading } = useAuth()
+  const [watchlist, setWatchlist] = useState<WatchlistApi | null>(null)
+  const [items, setItems] = useState<WatchlistItemApi[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sortBy, setSortBy] = useState<'added' | 'title'>('added')
 
-  const handleRemove = (id: string) => {
-    setItems(items.filter((item) => item.id !== id))
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    async function loadWatchlist() {
+      try {
+        let lists = await fetchWatchlists()
+        let wl = lists[0]
+        if (!wl) {
+          // Create default watchlist if none exists
+          wl = await createWatchlist('My Watchlist')
+        }
+        setWatchlist(wl)
+        const wlItems = await fetchWatchlistItems(wl.id)
+        setItems(wlItems)
+      } catch (err) {
+        console.error('Failed to load watchlist:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadWatchlist()
+  }, [user, authLoading])
+
+  const handleRemove = async (itemId: string) => {
+    if (!watchlist) return
+    try {
+      await removeFromWatchlist(watchlist.id, itemId)
+      setItems(items.filter((item) => item.id !== itemId))
+    } catch (err) {
+      console.error('Failed to remove item:', err)
+    }
   }
 
   const sortedItems = [...items].sort((a, b) => {
     switch (sortBy) {
-      case 'rating':
-        return b.rating - a.rating
       case 'title':
-        return a.title.localeCompare(b.title)
-      case 'year':
-        return b.year - a.year
+        return (a.title || '').localeCompare(b.title || '')
       case 'added':
       default:
-        return new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime()
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     }
   })
+
+  if (!authLoading && !user) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h2 className="text-2xl font-bold text-foreground mb-2">Sign in to see your watchlist</h2>
+          <p className="text-muted-foreground mb-8">Create an account or sign in to save movies.</p>
+          <Link href="/login">
+            <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              Sign In
+            </Button>
+          </Link>
+        </div>
+      </main>
+    )
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-lg">Loading watchlist...</div>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -64,7 +121,7 @@ export default function WatchlistPage() {
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Sort by:</span>
             <div className="flex gap-2 flex-wrap">
-              {(['added', 'rating', 'title', 'year'] as const).map((option) => (
+              {(['added', 'title'] as const).map((option) => (
                 <Button
                   key={option}
                   variant={sortBy === option ? 'default' : 'outline'}
@@ -72,7 +129,7 @@ export default function WatchlistPage() {
                   onClick={() => setSortBy(option)}
                   className={sortBy === option ? 'bg-accent hover:bg-accent/90 text-accent-foreground' : ''}
                 >
-                  {option === 'added' ? 'Recently Added' : option.charAt(0).toUpperCase() + option.slice(1)}
+                  {option === 'added' ? 'Recently Added' : 'Title'}
                 </Button>
               ))}
             </div>
@@ -86,10 +143,11 @@ export default function WatchlistPage() {
             {sortedItems.map((item) => (
               <div key={item.id} className="group relative">
                 <MovieCard
-                  id={item.id}
-                  title={item.title}
-                  rating={item.rating}
-                  year={item.year}
+                  id={item.tmdb_movie_id}
+                  title={item.title || 'Untitled'}
+                  rating={0}
+                  year={0}
+                  posterPath={item.poster_path}
                 />
                 <Button
                   size="icon"

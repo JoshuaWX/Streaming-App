@@ -4,15 +4,21 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MovieCard from './movie-card'
 import { useState, useRef } from 'react'
+import { extractYear } from '@/lib/tmdb'
+
+interface CarouselMovie {
+  id: string | number
+  title: string
+  rating?: number
+  vote_average?: number
+  year?: number
+  release_date?: string
+  poster_path?: string | null
+}
 
 interface ContentCarouselProps {
   title: string
-  movies: Array<{
-    id: string
-    title: string
-    rating: number
-    year: number
-  }>
+  movies: CarouselMovie[]
 }
 
 export default function ContentCarousel({ title, movies }: ContentCarouselProps) {
@@ -79,7 +85,13 @@ export default function ContentCarousel({ title, movies }: ContentCarouselProps)
       >
         {movies.map((movie) => (
           <div key={movie.id} className="flex-shrink-0 w-[150px] md:w-[200px] lg:w-[220px]">
-            <MovieCard id={movie.id} title={movie.title} rating={movie.rating} year={movie.year} />
+            <MovieCard
+              id={movie.id}
+              title={movie.title}
+              rating={movie.vote_average ?? movie.rating ?? 0}
+              year={movie.release_date ? extractYear(movie.release_date) : (movie.year ?? 0)}
+              posterPath={movie.poster_path}
+            />
           </div>
         ))}
       </div>

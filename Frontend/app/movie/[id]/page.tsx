@@ -1,28 +1,64 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import Footer from '@/components/footer'
+import MovieCard from '@/components/movie-card'
 import { Button } from '@/components/ui/button'
-import { getMovie, getAllMovies } from '@/lib/movies'
+import { fetchMovieDetail, fetchRecommendations, type TmdbMovieDetail, type TmdbMovie } from '@/lib/api'
+import { backdropUrl, posterUrl, formatRuntime, maturityRating, extractYear } from '@/lib/tmdb'
+import { useAuth } from '@/context/auth-context'
 
-interface MovieDetailsPageProps {
-  params: {
-    id: string
-  }
-}
+export default function MovieDetailsPage() {
+  const params = useParams()
+  const tmdbId = Number(params.id)
+  const { user } = useAuth()
 
-export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
+  const [movie, setMovie] = useState<TmdbMovieDetail | null>(null)
+  const [related, setRelated] = useState<TmdbMovie[]>([])
+  const [loading, setLoading] = useState(true)
   const [addedToList, setAddedToList] = useState(false)
   const [isFavorited, setIsFavorited] = useState(false)
-  const movieDetails = getMovie(params.id)
 
-  if (!movieDetails) {
+  useEffect(() => {
+    if (!tmdbId || isNaN(tmdbId)) {
+      setLoading(false)
+      return
+    }
+
+    async function loadMovie() {
+      try {
+        const [detail, recs] = await Promise.all([
+          fetchMovieDetail(tmdbId),
+          fetchRecommendations(tmdbId).catch(() => ({ results: [] as TmdbMovie[] })),
+        ])
+        setMovie(detail)
+        setRelated(recs.results.slice(0, 8))
+      } catch (err) {
+        console.error('Failed to load movie:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadMovie()
+  }, [tmdbId])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground text-lg">Loading movie...</div>
+      </main>
+    )
+  }
+
+  if (!movie) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-foreground mb-4">Movie Not Found</h1>
-          <p className="text-muted-foreground mb-8">The movie you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-8">The movie you&apos;re looking for doesn&apos;t exist.</p>
           <Link href="/">
             <Button className="bg-accent hover:bg-accent/90 text-accent-foreground">
               Back to Home
@@ -33,24 +69,25 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
     )
   }
 
-  const handleAddToList = () => {
-    setAddedToList(!addedToList)
-  }
-
-  const handleFavorite = () => {
-    setIsFavorited(!isFavorited)
-  }
-
-  const relatedMovies = getAllMovies()
-    .filter((m) => m.id !== movieDetails.id && m.genre.some((g) => movieDetails.genre.includes(g)))
-    .slice(0, 4)
+  const director = movie.credits?.crew?.find((c) => c.job === 'Director')
+  const cast = movie.credits?.cast?.slice(0, 6) || []
+  const trailer = movie.videos?.results?.find(
+    (v) => v.type === 'Trailer' && v.site === 'YouTube'
+  )
+  const bgImage = backdropUrl(movie.backdrop_path)
+  const poster = posterUrl(movie.poster_path, 'w342')
 
   return (
     <main className="min-h-screen bg-background">
       {/* Hero Background */}
-      <div className={`relative bg-gradient-to-b from-card to-background h-96 border-b border-border bg-gradient-to-br ${movieDetails.posterColor}`}>
-        <div className="absolute inset-0 opacity-30 bg-gradient-to-r from-background via-transparent to-background" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />
+      <div className="relative h-96">
+        {bgImage ? (
+          <Image src={bgImage} alt={movie.title} fill className="object-cover" priority />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-card to-background" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
       </div>
 
       {/* Content */}
@@ -60,10 +97,20 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
           <div className="flex flex-col md:flex-row gap-8">
             {/* Poster */}
             <div className="flex-shrink-0">
-              <div className="w-40 md:w-48 aspect-video bg-card border-2 border-border rounded-lg overflow-hidden shadow-2xl">
-                <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-6xl">
-                  🎬
-                </div>
+              <div className="w-40 md:w-48 aspect-[2/3] bg-card border-2 border-border rounded-lg overflow-hidden shadow-2xl">
+                {poster ? (
+                  <Image
+                    src={poster}
+                    alt={movie.title}
+                    width={192}
+                    height={288}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-6xl">
+                    🎬
+                  </div>
+                )}
               </div>
             </div>
 
@@ -73,21 +120,24 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-2">
-                      {movieDetails.title}
+                      {movie.title}
                     </h1>
+                    {movie.tagline && (
+                      <p className="text-muted-foreground italic mb-3">&ldquo;{movie.tagline}&rdquo;</p>
+                    )}
                     <div className="flex flex-wrap gap-3 items-center">
                       <span className="inline-block bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-semibold">
-                        {movieDetails.rating}/10
+                        {movie.vote_average.toFixed(1)}/10
                       </span>
-                      <span className="text-muted-foreground">{movieDetails.year}</span>
-                      <span className="text-muted-foreground">{movieDetails.duration}</span>
+                      <span className="text-muted-foreground">{extractYear(movie.release_date)}</span>
+                      <span className="text-muted-foreground">{formatRuntime(movie.runtime)}</span>
                       <span className="inline-block border border-muted px-2 py-1 rounded text-xs text-muted-foreground">
-                        {movieDetails.maturityRating}
+                        {maturityRating(movie.adult)}
                       </span>
                     </div>
                   </div>
                   <button
-                    onClick={handleFavorite}
+                    onClick={() => setIsFavorited(!isFavorited)}
                     className={`p-3 rounded-full transition-colors ${
                       isFavorited
                         ? 'bg-accent text-accent-foreground'
@@ -103,38 +153,55 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
 
               {/* Director & Cast */}
               <div className="space-y-3 mb-6">
-                <div>
-                  <p className="text-muted-foreground text-sm">Director</p>
-                  <p className="text-foreground font-semibold">{movieDetails.director}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-sm">Cast</p>
-                  <p className="text-foreground">{movieDetails.cast.join(', ')}</p>
-                </div>
+                {director && (
+                  <div>
+                    <p className="text-muted-foreground text-sm">Director</p>
+                    <p className="text-foreground font-semibold">{director.name}</p>
+                  </div>
+                )}
+                {cast.length > 0 && (
+                  <div>
+                    <p className="text-muted-foreground text-sm">Cast</p>
+                    <p className="text-foreground">{cast.map((c) => c.name).join(', ')}</p>
+                  </div>
+                )}
               </div>
 
               {/* Genres */}
               <div className="flex flex-wrap gap-2 mb-6">
-                {movieDetails.genre.map((g) => (
+                {movie.genres.map((g) => (
                   <Link
-                    key={g}
-                    href={`/search?q=${g}`}
+                    key={g.id}
+                    href={`/search?q=${g.name}`}
                     className="inline-block bg-input hover:bg-input/80 text-foreground px-3 py-1 rounded-full text-sm transition-colors"
                   >
-                    {g}
+                    {g.name}
                   </Link>
                 ))}
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3 flex-wrap">
-                <Link href="/play" className="flex-1 min-w-[200px]">
-                  <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                    Play
-                  </Button>
-                </Link>
+                {trailer ? (
+                  <a
+                    href={`https://www.youtube.com/watch?v=${trailer.key}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[200px]"
+                  >
+                    <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                      ▶ Watch Trailer
+                    </Button>
+                  </a>
+                ) : (
+                  <Link href={`/play?id=${movie.id}`} className="flex-1 min-w-[200px]">
+                    <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                      Play
+                    </Button>
+                  </Link>
+                )}
                 <Button
-                  onClick={handleAddToList}
+                  onClick={() => setAddedToList(!addedToList)}
                   variant="outline"
                   className={`flex-1 min-w-[200px] ${
                     addedToList
@@ -153,12 +220,7 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
         <div className="grid md:grid-cols-3 gap-8 mb-12">
           <div className="md:col-span-2">
             <h2 className="text-2xl font-bold text-foreground mb-4">Overview</h2>
-            <p className="text-muted-foreground leading-relaxed mb-6">{movieDetails.description}</p>
-            
-            <h3 className="text-xl font-bold text-foreground mb-3">Full Plot</h3>
-            <p className="text-muted-foreground leading-relaxed whitespace-pre-line">
-              {movieDetails.fullPlot}
-            </p>
+            <p className="text-muted-foreground leading-relaxed mb-6">{movie.overview}</p>
           </div>
 
           {/* Additional Info */}
@@ -166,45 +228,59 @@ export default function MovieDetailsPage({ params }: MovieDetailsPageProps) {
             <h3 className="text-lg font-bold text-foreground mb-4">Info</h3>
             <div className="space-y-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Type</p>
-                <p className="text-foreground font-semibold">Movie</p>
+                <p className="text-muted-foreground">Status</p>
+                <p className="text-foreground font-semibold">{movie.status}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Release Year</p>
-                <p className="text-foreground font-semibold">{movieDetails.year}</p>
+                <p className="text-foreground font-semibold">{extractYear(movie.release_date)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Duration</p>
-                <p className="text-foreground font-semibold">{movieDetails.duration}</p>
+                <p className="text-foreground font-semibold">{formatRuntime(movie.runtime)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Rating</p>
-                <p className="text-foreground font-semibold">{movieDetails.maturityRating}</p>
+                <p className="text-foreground font-semibold">{maturityRating(movie.adult)}</p>
+              </div>
+              {movie.budget > 0 && (
+                <div>
+                  <p className="text-muted-foreground">Budget</p>
+                  <p className="text-foreground font-semibold">${(movie.budget / 1_000_000).toFixed(0)}M</p>
+                </div>
+              )}
+              {movie.revenue > 0 && (
+                <div>
+                  <p className="text-muted-foreground">Revenue</p>
+                  <p className="text-foreground font-semibold">${(movie.revenue / 1_000_000).toFixed(0)}M</p>
+                </div>
+              )}
+              <div>
+                <p className="text-muted-foreground">Language</p>
+                <p className="text-foreground font-semibold">{movie.original_language?.toUpperCase()}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Related Content */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Related Movies</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {relatedMovies.length > 0 ? (
-              relatedMovies.map((movie) => (
-                <Link key={movie.id} href={`/movie/${movie.id}`}>
-                  <div className={`aspect-video bg-gradient-to-br ${movie.posterColor} rounded-lg hover:ring-2 ring-accent transition-all cursor-pointer flex flex-col items-center justify-center text-4xl p-4`}>
-                    <div className="text-5xl mb-2">🎬</div>
-                    <p className="text-sm font-bold text-center text-white/90 truncate">{movie.title}</p>
-                  </div>
-                </Link>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-8 text-muted-foreground">
-                No related movies found
-              </div>
-            )}
+        {related.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-foreground mb-6">Recommended</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {related.map((m) => (
+                <MovieCard
+                  key={m.id}
+                  id={m.id}
+                  title={m.title}
+                  rating={m.vote_average}
+                  year={extractYear(m.release_date)}
+                  posterPath={m.poster_path}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <Footer />
