@@ -5,6 +5,7 @@ import HeroSection from '@/components/hero-section'
 import ContentCarousel from '@/components/content-carousel'
 import Footer from '@/components/footer'
 import { fetchTrending, fetchPopular, fetchTopRated, type TmdbMovie } from '@/lib/api'
+6
 
 export default function Page() {
   const [trending, setTrending] = useState<TmdbMovie[]>([])

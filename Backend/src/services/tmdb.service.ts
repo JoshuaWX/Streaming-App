@@ -146,6 +146,33 @@ export async function getRecommendations(
 }
 
 /**
+ * GET /movie/{id}/similar
+ */
+export async function getSimilarMovies(
+  tmdbId: number,
+  page: number
+): Promise<PaginatedResponse<TmdbMovie>> {
+  const cacheKey = 'movies:similar';
+  const params = { tmdbId, page };
+  const cached = await cacheGet<PaginatedResponse<TmdbMovie>>(cacheKey, params);
+  if (cached) return cached;
+
+  const { data } = await tmdb.get(`/movie/${tmdbId}/similar`, {
+    params: { page },
+  });
+
+  const result: PaginatedResponse<TmdbMovie> = {
+    results: data.results,
+    page: data.page,
+    total_pages: data.total_pages,
+    total_results: data.total_results,
+  };
+
+  await cacheSet(cacheKey, params, result, CacheTTL.RECOMMENDATIONS);
+  return result;
+}
+
+/**
  * GET /search/movie
  */
 export async function searchMovies(
@@ -177,4 +204,38 @@ export async function searchMovies(
 
   await cacheSet(cacheKey, params, result, CacheTTL.SEARCH);
   return result;
+}
+
+/**
+ * GET /person/{person_id}/movie_credits - Get movies by director
+ */
+export async function getDirectorMovies(tmdbId: number): Promise<TmdbMovie[]> {
+  const cacheKey = 'movies:director';
+  const params = { tmdbId };
+  const cached = await cacheGet<TmdbMovie[]>(cacheKey, params);
+  if (cached) return cached;
+
+  // First, get movie detail to find director
+  const movieDetail = await getMovieDetail(tmdbId);
+  const director = movieDetail.credits?.crew?.find((c) => c.job === 'Director');
+  if (!director) {
+    await cacheSet(cacheKey, params, [], CacheTTL.RECOMMENDATIONS);
+    return [];
+  }
+
+  // Fetch director's movie credits
+  const { data } = await tmdb.get(`/person/${director.id}/movie_credits`);
+
+  // Filter crew credits where job is 'Director', get unique movies, exclude current movie, limit to 8
+  const directedMovies = data.crew
+    .filter((credit: any) => credit.job === 'Director')
+    .map((credit: any) => credit)
+    .filter((movie: any, index: number, self: any[]) =>
+      index === self.findIndex((m) => m.id === movie.id)
+    )
+    .filter((movie: any) => movie.id !== tmdbId)
+    .slice(0, 8);
+
+  await cacheSet(cacheKey, params, directedMovies, CacheTTL.RECOMMENDATIONS);
+  return directedMovies;
 }

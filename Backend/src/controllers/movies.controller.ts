@@ -32,3 +32,9 @@ export const getRecommendations = asyncHandler(async (req: Request, res: Respons
   const data = await tmdbService.getRecommendations(Number(tmdbId), page);
   res.json({ data });
 });
+
+export const getDirectorMovies = asyncHandler(async (req: Request, res: Response) => {
+  const { tmdbId } = req.params as unknown as { tmdbId: number };
+  const data = await tmdbService.getDirectorMovies(Number(tmdbId));
+  res.json({ data });
+});

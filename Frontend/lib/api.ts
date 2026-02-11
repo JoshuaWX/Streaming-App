@@ -93,10 +93,33 @@ export async function fetchRecommendations(tmdbId: number, page = 1) {
   return data;
 }
 
+export async function fetchSimilarMovies(tmdbId: number, page = 1) {
+  const { data } = await api.get<PaginatedResponse<TmdbMovie>>(
+    `/movies/${tmdbId}/similar`,
+    { params: { page } }
+  );
+  return data;
+}
+
+export async function fetchDirectorMovies(tmdbId: number) {
+  const { data } = await api.get<TmdbMovie[]>(`/movies/${tmdbId}/director-movies`);
+  return data;
+}
+
 export async function searchMovies(query: string, page = 1, year?: number) {
   const { data } = await api.get<PaginatedResponse<TmdbMovie>>('/search/movies', {
     params: { q: query, page, ...(year ? { year } : {}) },
   });
+  return data;
+}
+
+export async function fetchCastDetail(castId: number) {
+  const { data } = await api.get<TmdbCastDetail>(`/cast/${castId}`);
+  return data;
+}
+
+export async function fetchCastMovies(castId: number) {
+  const { data } = await api.get<{ cast: TmdbMovie[] }>(`/cast/${castId}/movies`);
   return data;
 }
 
@@ -205,6 +228,8 @@ export interface TmdbMovieDetail extends TmdbMovie {
   status: string;
   genres: { id: number; name: string }[];
   production_companies: { id: number; name: string; logo_path: string | null }[];
+  production_countries: { iso_3166_1: string; name: string }[];
+  spoken_languages: { english_name: string; iso_639_1: string; name: string }[];
   credits?: { cast: TmdbCastMember[]; crew: TmdbCrewMember[] };
   videos?: { results: TmdbVideo[] };
 }
@@ -231,4 +256,17 @@ export interface TmdbVideo {
   name: string;
   site: string;
   type: string;
+}
+
+export interface TmdbCastDetail {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  gender: number;
+  known_for_department: string;
+  place_of_birth: string | null;
+  profile_path: string | null;
+  popularity: number;
 }

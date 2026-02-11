@@ -11,6 +11,7 @@ import {
   getTopRated,
   getMovieDetail,
   getRecommendations,
+  getDirectorMovies,
 } from '../controllers/movies.controller';
 
 const router = Router();
@@ -34,5 +35,8 @@ router.get(
   validate(paginationQuerySchema, 'query'),
   getRecommendations
 );
+
+// GET /movies/:tmdbId/director-movies
+router.get('/:tmdbId/director-movies', validate(movieIdParamSchema, 'params'), getDirectorMovies);
 
 export default router;
